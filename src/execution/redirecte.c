@@ -6,67 +6,80 @@
 /*   By: laoubaid <laoubaid@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/07/19 14:53:30 by laoubaid          #+#    #+#             */
-/*   Updated: 2024/07/21 21:38:35 by laoubaid         ###   ########.fr       */
+/*   Updated: 2024/08/04 20:17:31 by laoubaid         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../include/minishell.h"
 #include "../../include/execution.h"
 
-void count_redir(t_redir *tmp, int *in, int *out)
+void	count_redir(t_redir *tmp, int *in, int *out, int *app)
 {
-    while (tmp)
-    {
-        if (tmp->redir_type == R_STD_OUT)
-            (*out)++;
-        else if (tmp->redir_type == R_STD_IN)
-            (*in)++;
-        tmp = tmp->next;
-    }
+	while (tmp)
+	{
+		if (tmp->redir_type == R_STD_OUT)
+			(*out)++;
+		else if (tmp->redir_type == R_STD_IN)
+			(*in)++;
+		tmp = tmp->next;
+	}
 }
 
-void    duping(t_redir *tmp, int *inputs, int *outputs)
+int	duping_suite(int *tab, int i, t_redir *tmp, int flag)
 {
-    int i;
-    int j;
-
-    i = 0;
-    j = 0;
-    while (tmp)
-    {
-        if (tmp->redir_type == R_STD_OUT)
-        {
-            outputs[j] = open(tmp->filename, O_WRONLY | O_CREAT | O_TRUNC, 0664);
-            dup2(outputs[j], STDOUT_FILENO);
-            close(outputs[j++]);
-        }
-        else if (tmp->redir_type == R_STD_IN)
-        {
-            inputs[i] = open(tmp->filename, O_RDONLY);
-            if (inputs[i] == -1)
-            {
-                perror("file");
-                exit(1);
-            }
-            dup2(inputs[i], STDIN_FILENO);
-            close(inputs[i++]);
-        }
-        tmp = tmp->next;
-    }
+	if (flag == 1)
+		tab[i] = open(tmp->filename, O_WRONLY | O_CREAT | O_TRUNC, 0664);
+	if (flag == 2)
+		tab[i] = open(tmp->filename, O_RDONLY);
+	if (flag == 3)
+		tab[i] = open(tmp->filename, O_WRONLY | O_CREAT | O_APPEND, 0664);
+	if (tab[i] == -1)
+	{
+		perror("file");
+		exit(1);
+	}
+	if (flag == 1 || flag == 3)
+		dup2(tab[i], STDOUT_FILENO);
+	else
+		dup2(tab[i], STDIN_FILENO);
+	close(tab[i]);
+	return (i + 1);
 }
 
-void	redirecte(t_cmd *cmd)
+void	duping(t_redir *tmp, int *inputs, int *outputs, int *appends)
 {
-	int 	input_counter;
-    int 	output_counter;
-    int 	*inputs;
+	int	i;
+	int	j;
+	int	k;
+
+	i = 0;
+	j = 0;
+	k = 0;
+	while (tmp)
+	{
+		if (tmp->redir_type == R_STD_OUT)
+			j = duping_suite(outputs, j, tmp, 1);
+		else if (tmp->redir_type == R_STD_IN)
+			i = duping_suite(inputs, i, tmp, 2);
+		else if (tmp->redir_type == R_APPEND)
+			k = duping_suite(appends, k, tmp, 3);
+		tmp = tmp->next;
+	}
+}
+
+void	redirecte(t_cmd *cmd, int in_count, int out_count,int apd_count)
+{
+	int 	*inputs;
 	int		*outputs;
-    t_redir *tmp;
+	int		*appends;
+	t_redir	*tmp;
 
-    input_counter = 0;
-    output_counter = 0;
-    count_redir(cmd->redirs, &input_counter, &output_counter);
-    inputs = malloc(sizeof(int) * input_counter);
-    outputs = malloc(sizeof(int) * output_counter);
-    duping(cmd->redirs, inputs, outputs);
+	count_redir(cmd->redirs, &in_count, &out_count, &apd_count);
+	inputs = malloc(sizeof(int) * in_count);
+	outputs = malloc(sizeof(int) * out_count);
+	appends = malloc(sizeof(int) * apd_count);
+	duping(cmd->redirs, inputs, outputs, appends);
+	free(inputs);
+	free(outputs);
+	free(appends);
 }
